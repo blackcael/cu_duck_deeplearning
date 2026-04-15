@@ -1,0 +1,4 @@
+.codex
+pycache
+venv
+*__pycache__
