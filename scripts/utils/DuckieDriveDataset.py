@@ -4,6 +4,7 @@ from typing import Optional
 
 import pandas as pd
 import torch
+import torch.nn.functional as F
 import torchvision.transforms as T
 from PIL import Image
 from torch.utils.data import Dataset
@@ -104,12 +105,16 @@ class DuckieDriveDataset(Dataset):
         preload_images: bool = False,
         use_angles: bool = False,
         use_blue_channel: bool = False,
+        smooth_labels: bool = False,
+        smoothing_window: int = 5,
     ):
         super().__init__()
 
         self.image_tensor = None
         self.image_paths = None
         self.use_blue_channel = use_blue_channel
+        self.smooth_labels = smooth_labels
+        self.smoothing_window = smoothing_window
         self.transform = T.Compose([
             T.Resize(image_size),
             T.ToTensor(),
@@ -144,6 +149,9 @@ class DuckieDriveDataset(Dataset):
 
         if velocity_tensor is None:
             raise ValueError("velocity_tensor is required")
+
+        if self.smooth_labels:
+            velocity_tensor = self._smooth_velocity_tensor(velocity_tensor, self.smoothing_window)
 
         self.velocity_tensor = velocity_tensor
 
@@ -193,6 +201,8 @@ class DuckieDriveDataset(Dataset):
                 velocity_tensor=validation_vels,
                 use_angles=self.use_angles,
                 use_blue_channel=self.use_blue_channel,
+                smooth_labels=False,
+                smoothing_window=self.smoothing_window,
             )
         else:
             validation_imgs = self.image_paths[slice_idx:]
@@ -203,6 +213,8 @@ class DuckieDriveDataset(Dataset):
                 image_size=self.transform.transforms[0].size,
                 use_angles=self.use_angles,
                 use_blue_channel=self.use_blue_channel,
+                smooth_labels=False,
+                smoothing_window=self.smoothing_window,
             )
 
         return validation_dataset
@@ -248,6 +260,28 @@ class DuckieDriveDataset(Dataset):
             scaled_bins,
         )
         return torch.clamp(torch.round(scaled_bins), -22, 22)
+
+    def _smooth_velocity_tensor(self, velocity_tensor, window_size):
+        """
+        Smooth sequential [N,2] wheel-velocity labels with a centered moving average.
+        """
+        v = torch.as_tensor(velocity_tensor, dtype=torch.float32)
+
+        if v.ndim != 2 or v.shape[1] != 2:
+            raise ValueError(f"Expected velocity tensor shape [N, 2], got {tuple(v.shape)}")
+
+        if window_size <= 1:
+            return v
+
+        if window_size % 2 == 0:
+            window_size += 1
+
+        # [N,2] -> [1,2,N] so avg_pool1d can smooth along time dimension.
+        vt = v.transpose(0, 1).unsqueeze(0)
+        pad = window_size // 2
+        vt = F.pad(vt, (pad, pad), mode="replicate")
+        vt = F.avg_pool1d(vt, kernel_size=window_size, stride=1)
+        return vt.squeeze(0).transpose(0, 1)
 
 
 

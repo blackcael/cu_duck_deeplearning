@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,13 +11,16 @@ from torchvision import transforms, utils, datasets
 from utils.DuckieDriveDataset import DuckieDriveDataset
 from utils.ALVINN import ALVINN
 from utils.plotting import plot_training
-import utils.utils
+from utils.model_utils import load_model, save_checkpoint
+import scripts.utils.fn_utils
+
 
 from utils.data_player import play_dataset_with_arrow
 import matplotlib.pyplot as plt
 
 # Global Constants
 DEF_DATA_DIR = "data/"
+DEF_MODELS_DIR = "models"
 
 
 def loss_fn(logits, truth_angle):
@@ -74,6 +79,8 @@ def print_memory_summary(device, verbose = False):
         print(f"Memory Info: Free={free / (1024**3):.2f}GB, Total={total / (1024**3):.2f}GB")
         if verbose:
             print(torch.cuda.memory_summary())
+
+
 
 
 def train(model, optimizer, training_dataloader, validation_dataloader, n_optimization_steps, log_interval, val_interval, device):
@@ -140,7 +147,7 @@ def train_ALVINN():
     print_memory_summary(device)
 
     # Configre imagesize
-    imagesize = (512, 512)
+    imagesize = (32, 32)
 
     # Bring in DataSet
     dataset = DuckieDriveDataset(
@@ -149,6 +156,8 @@ def train_ALVINN():
         image_size=imagesize,
         use_angles=True,
         use_blue_channel=True,
+        smooth_labels=True,
+        smoothing_window=7,
     )
     print(f"dataset length: {len(dataset)}")
     print(f"Average Speed in Dataset: {dataset.get_average_speed()}")
@@ -171,7 +180,7 @@ def train_ALVINN():
     LR = 3e-4
     optimizer = torch.optim.AdamW(params = alvinn.parameters(), lr = LR, weight_decay=1e-2)
 
-    n_minibatch_steps = 20
+    n_minibatch_steps = 10000
 
     print("Beginning Training!")
     train_results = train(
@@ -181,10 +190,19 @@ def train_ALVINN():
         validation_dataloader,
         n_minibatch_steps,
         log_interval = 10,
-        val_interval = 50,
+        val_interval = 10,
         device = device
     )
     print("\nCompleted Training!")
+
+    checkpoint_path, latest_path = save_checkpoint(
+        model=alvinn,
+        optimizer=optimizer,
+        image_size=imagesize,
+        n_optimization_steps=n_minibatch_steps,
+    )
+    print(f"Saved checkpoint: {checkpoint_path}")
+    print(f"Updated latest checkpoint: {latest_path}")
     
     training_loss, training_class_accs, val_loss, validation_class_accs, training_bin_maes, validation_bin_maes, val_ts = train_results
     plot_training(training_loss, training_class_accs, val_loss, validation_class_accs, training_bin_maes, validation_bin_maes, val_ts)

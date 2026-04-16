@@ -1,6 +1,7 @@
 LR = 0.01
 AXEL_LENGTH_MM = 50
 
+import torch
 
 
 
@@ -19,3 +20,6 @@ def scale_v_pair_to_45(v_pair, max_mag_w, axel_len_mm):
     w = (v_pair[0] - v_pair[1]) / axel_len_mm
     unit_w = w / max_mag_w
     return(round(unit_w * 22))
+
+def logits_to_angle(logits):
+    return torch.argmax(logits, dim=1) - 22
