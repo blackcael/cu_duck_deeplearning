@@ -7,7 +7,7 @@ from utils.ALVINN import ALVINN
 
 DEF_MODELS_DIR = "models"
 
-def save_checkpoint(model, optimizer, image_size, n_optimization_steps, save_dir=DEF_MODELS_DIR, model_name="alvinn"):
+def save_checkpoint(model, optimizer, image_size, n_optimization_steps, save_dir=DEF_MODELS_DIR, model_name="unnamed"):
     save_dir = Path(save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
 

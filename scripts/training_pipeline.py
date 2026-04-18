@@ -142,7 +142,8 @@ def train_ALVINN(
         image_size = (32,32),
         n_minibatch_steps = 10000,
         preload_num_workers = 8,
-        turn_data_smoothing_window = 9
+        turn_data_smoothing_window = 9,
+        use_blue = False
 ):
     # Make results reproducible
     torch.manual_seed(0)
@@ -159,7 +160,7 @@ def train_ALVINN(
         preload_num_workers=preload_num_workers,
         image_size=image_size,
         use_angles=True,
-        use_blue_channel=True,
+        use_blue_channel=use_blue,
         smooth_labels=True,
         smoothing_window=turn_data_smoothing_window,
     )
@@ -288,6 +289,7 @@ def train_SIMONN(
 
     checkpoint_path, latest_path = save_checkpoint(
         model=simonn,
+        model_name = "simonn"
         optimizer=optimizer,
         image_size=image_size,
         n_optimization_steps=n_minibatch_steps,
@@ -312,7 +314,7 @@ def train_SIMONN(
     
 
 if __name__ == "__main__":
-    train_SIMONN(
+    train_ALVINN(
         n_minibatch_steps=200000,
         turn_data_smoothing_window = 13,
         use_blue = True
