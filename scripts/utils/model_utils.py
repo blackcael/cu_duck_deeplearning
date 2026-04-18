@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from utils.ALVINN import ALVINN
 
+DEF_MODELS_DIR = "models"
 
 def save_checkpoint(model, optimizer, image_size, n_optimization_steps, save_dir=DEF_MODELS_DIR, model_name="alvinn"):
     save_dir = Path(save_dir)

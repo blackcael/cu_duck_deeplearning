@@ -3,3 +3,5 @@ pycache
 venv
 *__pycache__
 *.bag
+data/images/**
+!data/images/.gitkeep

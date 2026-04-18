@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from concurrent.futures import ThreadPoolExecutor
+from itertools import repeat
 import os
 from typing import Optional
 
@@ -19,22 +21,49 @@ DATA_PAIRS_CSV = "samples.csv"
 AXEL_L_MM = 50
 ZERO_DEADBAND_BINS = 0.75
 
-def filenames_to_color_tensors(file_list, image_size=(512, 512), use_blue_channel=False):
+# In-process caches to avoid repeated CSV parsing and image decoding on repeated
+# training runs from the same Python process (e.g., notebook/REPL loops).
+_SAMPLE_CACHE = {}
+_PRELOADED_IMAGE_CACHE = {}
+
+def _load_and_transform_image(path: str, transform):
+    img = Image.open(path).convert("RGB")
+    return transform(img)
+
+
+def filenames_to_color_tensors(
+    file_list,
+    image_size=(512, 512),
+    use_blue_channel=False,
+    preload_num_workers: int = 1,
+):
     transform = T.Compose([
         T.Resize(image_size),
         T.ToTensor(),  # [3, H, W], values in [0,1]
         T.Lambda(lambda img: img[2:3, :, :]) if use_blue_channel else T.Lambda(lambda img: img),
     ])
 
-    tensors = []
-    for path in file_list:
-        img = Image.open(path).convert("RGB")
-        tensors.append(transform(img))
+    if preload_num_workers <= 1:
+        tensors = []
+        for path in file_list:
+            tensors.append(_load_and_transform_image(path, transform))
+        return tensors
+
+    # Parallel image decode/resize using thread helpers.
+    with ThreadPoolExecutor(max_workers=preload_num_workers) as executor:
+        tensors = list(executor.map(_load_and_transform_image, file_list, repeat(transform)))
     return tensors
 
 
 def load_drive_samples(data_folder_path: str, filter_idle_frames: bool = True):
     """Load csv metadata and return (image_paths, velocity_tensor)."""
+    cache_key = (data_folder_path, filter_idle_frames)
+    cached = _SAMPLE_CACHE.get(cache_key)
+    if cached is not None:
+        image_paths, velocity_tensor = cached
+        # Return shallow copies so per-dataset mutations do not affect cache.
+        return list(image_paths), velocity_tensor.clone()
+
     data_pairs_csv = os.path.join(data_folder_path, DATA_PAIRS_CSV)
     csv_data = pd.read_csv(data_pairs_csv)
 
@@ -52,7 +81,14 @@ def load_drive_samples(data_folder_path: str, filter_idle_frames: bool = True):
     velocity_np = csv_data[[VEL_LEFT_COL, VEL_RIGHT_COL]].to_numpy(dtype="float32")
     velocity_tensor = torch.tensor(velocity_np, dtype=torch.float32)
 
+    _SAMPLE_CACHE[cache_key] = (list(image_paths), velocity_tensor.clone())
     return image_paths, velocity_tensor
+
+
+def clear_dataset_cache():
+    """Clear module-level in-memory caches for samples and preloaded images."""
+    _SAMPLE_CACHE.clear()
+    _PRELOADED_IMAGE_CACHE.clear()
 
 
 def csv_and_images_to_tensors(
@@ -60,6 +96,7 @@ def csv_and_images_to_tensors(
     filter_idle_frames=True,
     image_size=(512, 512),
     use_blue_channel=False,
+    preload_num_workers: int = 1,
 ):
     """
     Eager path: load *all* images immediately into one tensor.
@@ -73,6 +110,7 @@ def csv_and_images_to_tensors(
             image_paths,
             image_size=image_size,
             use_blue_channel=use_blue_channel,
+            preload_num_workers=preload_num_workers,
         )
     )
     print("end of assembling image tensor")
@@ -107,6 +145,8 @@ class DuckieDriveDataset(Dataset):
         use_blue_channel: bool = False,
         smooth_labels: bool = False,
         smoothing_window: int = 5,
+        cache_preloaded_images: bool = True,
+        preload_num_workers: int = 1,
     ):
         super().__init__()
 
@@ -129,13 +169,30 @@ class DuckieDriveDataset(Dataset):
                 )
             if preload_images:
                 print("preloading all images into memory")
-                self.image_tensor = torch.stack(
-                    filenames_to_color_tensors(
-                        image_paths,
-                        image_size=image_size,
-                        use_blue_channel=self.use_blue_channel,
+                cache_key = None
+                if cache_preloaded_images and data_dir is not None and image_paths is not None:
+                    cache_key = (
+                        os.path.abspath(data_dir),
+                        bool(filter_idle_frames),
+                        tuple(image_size),
+                        bool(self.use_blue_channel),
                     )
-                )
+                    cached_tensor = _PRELOADED_IMAGE_CACHE.get(cache_key)
+                    if cached_tensor is not None:
+                        print("using cached preloaded images")
+                        self.image_tensor = cached_tensor
+
+                if self.image_tensor is None:
+                    self.image_tensor = torch.stack(
+                        filenames_to_color_tensors(
+                            image_paths,
+                            image_size=image_size,
+                            use_blue_channel=self.use_blue_channel,
+                            preload_num_workers=preload_num_workers,
+                        )
+                    )
+                    if cache_key is not None:
+                        _PRELOADED_IMAGE_CACHE[cache_key] = self.image_tensor
             else:
                 self.image_paths = image_paths
 

@@ -19,7 +19,7 @@ import scripts.utils.fn_utils as FN_Utils
 DUCKIEBOT = os.environ.get("VEHICLE_NAME")
 
 WHEELS_CMD_TOPIC = f"/{DUCKIEBOT}/lane_controller_node/car_cmd"
-IMAGE_TOPIC = f"/{DUCKIEBOT}/camera_node/image/compressed"
+IMAGE_TOPIC = f"/{DUCKIEBOT}/camera_node/image/compressed
 
 X_VEL_PARAM_NAME = f"/{DUCKIEBOT}/dl_ctrl_x_vel"
 X_VEL_DEF = 10

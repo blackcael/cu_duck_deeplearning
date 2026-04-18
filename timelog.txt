@@ -3,8 +3,9 @@ Mar 26 - 3 Hours - Reinitilaizing the ECEN433 Duckiebot and collecting my first 
 Apr 07 - 3 Hours - Configuring the Dataset
 Apr 14 - 5 Hours - Writing training pipeline and analysis tools
 Apr 15 - 2 Hours - Working on ROS nodes
+Apr 16 - 7 Hours - Gathering 15+ Rosbags of data and Training ALVINN_V1
+Apr 18 - 
 
 
-
-Total Hours: 15 Hours
+Total Hours: 22 Hours
 
