@@ -25,6 +25,7 @@ OUTPUT_LAYER_SIZE = 45
 class ALVINN(nn.Module):
     def __init__(self, imagesize_hw = (INPUT_SIZE_H, INPUT_SIZE_W)):
         super().__init__()
+        self.name = "alvinn"
         h, w = imagesize_hw
         self.net = nn.Sequential(
             nn.Linear(h * w, HIDDEN_UNITS),
@@ -36,3 +37,9 @@ class ALVINN(nn.Module):
         x = torch.flatten(x, start_dim=1)
         x = self.net(x)
         return x
+
+    def get_name(self):
+        return self.name
+    
+    def set_name(self, new_name):
+        self.name = new_name

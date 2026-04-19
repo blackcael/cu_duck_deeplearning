@@ -85,6 +85,7 @@ def _model_output_to_unit_arrow(model_output: torch.Tensor) -> Tuple[float, floa
 def play_dataset_with_arrow(
     dataset,
     model=None,
+    model_name: Optional[str] = None,
     start_idx: int = 0,
     end_idx: Optional[int] = None,
     step: int = 1,
@@ -100,6 +101,7 @@ def play_dataset_with_arrow(
     Args:
         dataset: A DuckieDriveDataset-like object returning (image, label).
         model: Optional torch model. If provided, a second arrow is drawn for prediction.
+        model_name: Optional model label to include in the animation title.
         start_idx: Starting index in the dataset.
         end_idx: End index (exclusive). Defaults to len(dataset).
         step: Step size through dataset indices.
@@ -187,7 +189,8 @@ def play_dataset_with_arrow(
             s=30,
         )
 
-    title_text = f"idx={indices[0]} | gt: {label_text}"
+    title_prefix = f"model: {model_name} | " if model_name else ""
+    title_text = f"{title_prefix}idx={indices[0]} | gt: {label_text}"
     if model is not None:
         title_text += f" | pred: {pred_text}"
     ax.set_title(title_text)
@@ -218,9 +221,9 @@ def play_dataset_with_arrow(
             pred_y2 = cy_i - pred_dy_i * arrow_len_i
             pred_arrow_artist.set_data([cx_i, pred_x2], [cy_i, pred_y2])
             pred_marker_artist.set_offsets(np.array([[pred_x2, pred_y2]]))
-            ax.set_title(f"idx={idx} | gt: {text_i} | pred: {pred_text_i}")
+            ax.set_title(f"{title_prefix}idx={idx} | gt: {text_i} | pred: {pred_text_i}")
         else:
-            ax.set_title(f"idx={idx} | gt: {text_i}")
+            ax.set_title(f"{title_prefix}idx={idx} | gt: {text_i}")
 
         artists = [im_artist, arrow_artist, marker_artist]
         if model is not None:

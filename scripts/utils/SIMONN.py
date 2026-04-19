@@ -11,8 +11,6 @@ from PIL import Image
 INPUT_SIZE_H = 32
 INPUT_SIZE_W = 32
 
-HIDDEN_UNITS = 29
-
 OUTPUT_LAYER_SIZE = 45
 
 
@@ -30,7 +28,7 @@ class SIMONN_LAYER(nn.Module):
     def forward(self, x):
         return self.net(x)
 
-
+ 
 
 class SIMONN(nn.Module):
     def __init__(self, imagesize_hw = (INPUT_SIZE_H, INPUT_SIZE_W), color_channels = 1, p_dropout = 0.1):

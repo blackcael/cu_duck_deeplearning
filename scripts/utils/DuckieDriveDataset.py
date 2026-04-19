@@ -90,6 +90,14 @@ def clear_dataset_cache():
     _SAMPLE_CACHE.clear()
     _PRELOADED_IMAGE_CACHE.clear()
 
+def get_num_datapoints(data_folder_path: str, filter_idle_frames: bool = True) -> int:
+    """Return number of datapoints in the CSV (optionally after idle-frame filtering)."""
+    data_pairs_csv = os.path.join(data_folder_path, DATA_PAIRS_CSV)
+    csv_data = pd.read_csv(data_pairs_csv)
+    if filter_idle_frames:
+        csv_data = csv_data[(csv_data[VEL_LEFT_COL] != 0.0) | (csv_data[VEL_RIGHT_COL] != 0.0)]
+    return int(len(csv_data))
+
 
 def csv_and_images_to_tensors(
     data_folder_path: str,
@@ -147,8 +155,15 @@ class DuckieDriveDataset(Dataset):
         smoothing_window: int = 5,
         cache_preloaded_images: bool = True,
         preload_num_workers: int = 1,
+        start: int = 0,
+        end: Optional[int] = None,
     ):
         super().__init__()
+
+        if start < 0:
+            raise ValueError(f"start must be >= 0, got {start}")
+        if end is not None and end < start:
+            raise ValueError(f"end must be >= start, got start={start}, end={end}")
 
         self.image_tensor = None
         self.image_paths = None
@@ -167,6 +182,14 @@ class DuckieDriveDataset(Dataset):
                     data_dir,
                     filter_idle_frames=filter_idle_frames,
                 )
+
+            if velocity_tensor is None:
+                raise ValueError("velocity_tensor is required")
+
+            dataset_end = len(velocity_tensor) if end is None else min(end, len(velocity_tensor))
+            image_paths = image_paths[start:dataset_end]
+            velocity_tensor = velocity_tensor[start:dataset_end]
+
             if preload_images:
                 print("preloading all images into memory")
                 cache_key = None
@@ -176,6 +199,8 @@ class DuckieDriveDataset(Dataset):
                         bool(filter_idle_frames),
                         tuple(image_size),
                         bool(self.use_blue_channel),
+                        int(start),
+                        int(dataset_end),
                     )
                     cached_tensor = _PRELOADED_IMAGE_CACHE.get(cache_key)
                     if cached_tensor is not None:
@@ -197,7 +222,9 @@ class DuckieDriveDataset(Dataset):
                 self.image_paths = image_paths
 
         elif image_tensor is not None and velocity_tensor is not None:
-            self.image_tensor = image_tensor
+            dataset_end = len(velocity_tensor) if end is None else min(end, len(velocity_tensor))
+            self.image_tensor = image_tensor[start:dataset_end]
+            velocity_tensor = velocity_tensor[start:dataset_end]
 
         else:
             raise ValueError(

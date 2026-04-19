@@ -38,3 +38,10 @@ def load_model(checkpoint_path, device=None):
     model.to(device)
     model.eval()
     return model, checkpoint
+
+def print_model_params(model):
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+    print(f"Total params: {total_params:,}")
+    print(f"Trainable params: {trainable_params:,}")
