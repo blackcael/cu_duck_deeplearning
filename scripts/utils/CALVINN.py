@@ -70,6 +70,7 @@ class CALVINN(nn.Module):
         )
 
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
+        
         self.classifier = nn.Sequential(
             nn.Flatten(start_dim=1),
             nn.Linear(c3, lin_hidden_layer_units),
